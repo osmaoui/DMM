@@ -226,7 +226,7 @@ class DMM(nn.Module):
         predict_weights = torch.sigmoid(predict_weights)
         predict_weights = torch.nn.functional.normalize(predict_weights, dim=-1, p=1)
 
-        sdf_final = torch.concat(sdf_list, dim=-1)
+        sdf_final = torch.cat(sdf_list, dim=-1)
         sdf_final = torch.sum(sdf_final * predict_weights, dim=-1, keepdim=True)
 
         embedding_loss = embedding_loss / len(latent_vec)

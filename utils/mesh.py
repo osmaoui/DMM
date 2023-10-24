@@ -145,7 +145,7 @@ def colorize_mesh(dmm_net, lat_vec_dict, rgb, mesh_v, mesh_f, filename):
         color_blend = torch.stack(color_list, dim=-1).cuda()
         color_blend = torch.sum(color_blend * predict_weights[..., None, :], dim=-1).squeeze()
         mesh_v_color.append(color_blend)
-    mesh_v_color = (torch.concat(mesh_v_color, dim=0).cpu().numpy() * 255).astype(np.uint8)
+    mesh_v_color = (torch.cat(mesh_v_color, dim=0).cpu().numpy() * 255).astype(np.uint8)
     save_to_ply(mesh_v.cpu().numpy(), mesh_v_color, mesh_f, filename)
 
 
