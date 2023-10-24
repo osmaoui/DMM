@@ -30,7 +30,7 @@ def reconstruct(
     num_samples=100000,
     lr=5e-5,
 ):
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     loss_l1 = torch.nn.L1Loss(reduction="sum")
     lat_vecs = dict()

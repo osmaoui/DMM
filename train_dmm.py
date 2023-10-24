@@ -124,7 +124,7 @@ def get_spec_with_default(specs, key, default):
 def main_function(experiment_directory, continue_from):
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
+    logging.info('device: ' + str(device))
     logging.info("running " + experiment_directory)
 
     # Initialize the tensorboard log
@@ -217,19 +217,19 @@ def main_function(experiment_directory, continue_from):
     logging.info("There are {} scenes".format(num_scenes))
 
     # Compose DMM network
-    dmm_net = DMM(specs, avg_centers).to(device)
+    dmm_net = DMM(specs, avg_centers)
 
     # Initialize latent codes for teeth and gums
     latent_vecs = torch.nn.ModuleDict()
     for label_id in dmm_net.label_list:
         if label_id == 0:
             latent_vecs[str(label_id)] = torch.nn.Embedding(num_scenes,
-                                                            specs["GumDeformNetworkSpecs"]["latent_dim"]).to(device)
+                                                            specs["GumDeformNetworkSpecs"]["latent_dim"]).to('cuda:1')
         else:
             latent_vecs[str(label_id)] = torch.nn.Embedding(num_scenes,
-                                                            specs["TeethDeformNetworkSpecs"]["latent_dim"]).to(device)
+                                                            specs["TeethDeformNetworkSpecs"]["latent_dim"]).to('cuda:1')
         torch.nn.init.normal_(latent_vecs[str(label_id)].weight, mean=0, std=0.002)
-        latent_vecs[str(label_id)] = torch.nn.DataParallel(latent_vecs[str(label_id)])
+        latent_vecs[str(label_id)] = torch.nn.DataParallel(latent_vecs[str(label_id)], device_ids=[1])
 
     # Prepare for the optimizer
     param_lr_lists = list()
@@ -324,7 +324,7 @@ def main_function(experiment_directory, continue_from):
             optim.zero_grad()
             train_loss.backward()
             optim.step()
-            if log_counter % 20 == 0:
+            if log_counter % 1 == 0:
                 logging.info("Total loss: {:10.5f}; Sep loss: {:10.5f}; Embd loss: {:10.5f}; center loss: {:10.5f}; BCE loss: {:10.5f}".format(
                     train_loss.item(), losses_log['sep_loss'], losses_log['embedding_reg_loss'], losses_log['center_loss'], losses_log['blend_loss'])
                 )
@@ -383,4 +383,3 @@ if __name__ == "__main__":
     configure_logging(args)
 
     main_function(args.experiment_directory, args.continue_from)
-

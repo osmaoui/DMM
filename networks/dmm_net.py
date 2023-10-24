@@ -1,5 +1,3 @@
-
-
 import torch
 from torch import nn
 from utils.math import compute_gradient, compute_jacobian, screw_axis_to_rt
@@ -21,13 +19,13 @@ class DMM(nn.Module):
 
         for label_id in self.label_list:
             if label_id == 0:
-                self.deform_nets_dict[str(label_id)] = DeformNet(**specs["GumDeformNetworkSpecs"])
+                self.deform_nets_dict[str(label_id)] = DeformNet(**specs["GumDeformNetworkSpecs"]).to('cuda:1')
             else:
-                self.deform_nets_dict[str(label_id)] = DeformNet(**specs["TeethDeformNetworkSpecs"])
-            self.ref_nets_dict[str(label_id)] = arch_ref.MLPNet(**specs["NetworkSpecsRef"])
+                self.deform_nets_dict[str(label_id)] = DeformNet(**specs["TeethDeformNetworkSpecs"]).to('cuda:1')
+            self.ref_nets_dict[str(label_id)] = arch_ref.MLPNet(**specs["NetworkSpecsRef"]).to('cuda:0')
 
-            self.deform_nets_dict[str(label_id)] = DataParallel(self.deform_nets_dict[str(label_id)])
-            self.ref_nets_dict[str(label_id)] = torch.nn.DataParallel(self.ref_nets_dict[str(label_id)])
+            self.deform_nets_dict[str(label_id)] = DataParallel(self.deform_nets_dict[str(label_id)], device_ids=[1])
+            self.ref_nets_dict[str(label_id)] = torch.nn.DataParallel(self.ref_nets_dict[str(label_id)], device_ids=[0])
 
         self.bce = torch.nn.BCEWithLogitsLoss()
         self.l1loss = torch.nn.L1Loss(reduction='sum')
@@ -74,12 +72,12 @@ class DMM(nn.Module):
             embedding_reg_loss += torch.mean(embeddings[label_id] ** 2) * 1e6
 
             # Deformed by the deform-net
-            deform_model_output[label_id] = self.deform_nets_dict[str_label_id](coords, embeddings[label_id])
+            deform_model_output[label_id] = self.deform_nets_dict[str_label_id](coords.to('cuda:1'), embeddings[label_id].to('cuda:1')).to('cuda:0')
 
             if label_id > 0:
                 # Deform centers
                 center[label_id] = centers_tensor[..., label_id:label_id + 1, :]
-                deform_model_center_output[label_id] = self.deform_nets_dict[str_label_id](center[label_id], embeddings[label_id])
+                deform_model_center_output[label_id] = self.deform_nets_dict[str_label_id](center[label_id], embeddings[label_id]).to('cuda:0')
 
                 # Compute the centroid loss
                 for batch_id in range(center[label_id].shape[0]):
@@ -111,7 +109,7 @@ class DMM(nn.Module):
                 deformation[label_id] = new_coords[label_id] - coords
 
             # Forward the ref-net for SDF values
-            pred_sdf[label_id] = self.ref_nets_dict[str(label_id)](new_coords[label_id])
+            pred_sdf[label_id] = self.ref_nets_dict[str(label_id)](new_coords[label_id].to('cuda:1')).to('cuda:0')
 
             # Blend components for the overall SDF values
             blend_weights = deform_model_output[label_id][..., -1]
@@ -142,11 +140,11 @@ class DMM(nn.Module):
             sdf_list.append(component_sdf)
 
             # Compute gradients for component-wise losses
-            grad_template = compute_gradient(pred_sdf[label_id], new_coords[label_id])
+            grad_template = compute_gradient(pred_sdf[label_id], new_coords[label_id]).to('cuda:1')
             grad_deform = compute_jacobian(deformation[label_id], coords)
 
             losses = component_sdf_normal_loss(component_sdf, coords, is_on_surf, normal,
-                                     correction, grad_deform, grad_template,
+                                     correction, grad_deform.to('cuda:0'), grad_template.to('cuda:0'),
                                                label_ids[..., None], label_id)
 
 
@@ -175,7 +173,7 @@ class DMM(nn.Module):
         center_loss = center_loss / len(batch_label_list)
 
         train_loss += blend_loss
-        train_loss += embedding_reg_loss
+        train_loss += embedding_reg_loss.to('cuda:0')
         train_loss += sep_loss
         train_loss += center_loss
 
@@ -200,8 +198,7 @@ class DMM(nn.Module):
             str_label_id = str(int(label_id))
             embeddings = latent_vec[label_id]
             embedding_loss += torch.mean(embeddings ** 2) * 1e6
-
-            deform_model_output = self.deform_nets_dict[str_label_id](coords, embeddings)
+            deform_model_output = self.deform_nets_dict[str_label_id](coords, embeddings).to('cuda:0')
             if deform_model_output.shape[-1] == 5:
                 deformation = deform_model_output[..., :3]
                 new_coords = coords + deformation
@@ -226,7 +223,7 @@ class DMM(nn.Module):
         predict_weights = torch.sigmoid(predict_weights)
         predict_weights = torch.nn.functional.normalize(predict_weights, dim=-1, p=1)
 
-        sdf_final = torch.cat(sdf_list, dim=-1)
+        sdf_final = torch.concat(sdf_list, dim=-1)
         sdf_final = torch.sum(sdf_final * predict_weights, dim=-1, keepdim=True)
 
         embedding_loss = embedding_loss / len(latent_vec)

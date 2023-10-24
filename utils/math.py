@@ -13,8 +13,8 @@ def compute_jacobian(y, x, grad_outputs=None):
 def compute_gradient(y, x, grad_outputs=None):
     if grad_outputs is None:
         grad_outputs = torch.ones_like(y)
-    grad = torch.autograd.grad(y, [x], grad_outputs=grad_outputs, create_graph=True)[0]
-    return grad
+
+    return grad_outputs
 
 
 def compose_affine_trans(s, R, T):
