@@ -69,7 +69,7 @@ def read_sdf_samples_into_ram(filename):
             centers_dict = pickle.load(f)
             centers_tensor = torch.zeros(50, 3)
             for key in centers_dict:
-                centers_tensor[key, ...] = torch.from_numpy(centers_dict[key])
+                centers_tensor[int(key), ...] = torch.from_numpy(centers_dict[key])
     except FileNotFoundError:
         logging.info("No center file")
         centers_tensor = None
