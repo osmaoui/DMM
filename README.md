@@ -1,5 +1,18 @@
 # An Implicit Parametric Morphable Dental Model
 
+check the repo @ ahmed:10.1.20.52/workspace/DMM
+
+##### Reconstruct
+```
+CUDA_VISIBLE_DEVICES=0,1 python3 reconstruct.py -e ./examples/upper_dmm -d ./reconst_data/ --iters 300 --lr 1e-3 -s examples/splits/test_split.json -c latest
+```
+#### Train
+
+```
+CUDA_VISIBLE_DEVICES=0,1 python3 train_dmm.py -e examples/upper_dmm
+```
+
+
 ### [Project Page](https://vcai.mpi-inf.mpg.de/projects/DMM/) | [Paper](https://arxiv.org/abs/2211.11402)
 
 This is a PyTorch implementation of the Siggraph Asia 2022 Paper "An Implicit Parametric Morphable Dental Model".
